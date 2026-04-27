@@ -52,13 +52,13 @@ The pipeline runs automatically every day at midnight via a Cron scheduler insid
 
 ```
 economic_pipeline/
-├── run_pipeline.py         # Pipeline entry point
 ├── setup_db.py             # Database schema setup
 ├── start.sh                # Container startup script
 ├── Dockerfile              # App container definition
 ├── docker-compose.yml      # Multi-container orchestration
 ├── crontab                 # Cron schedule definition
 ├── src/
+│   ├── run_pipeline.py     # Pipeline entry point
 │   ├── config.py           # API keys, DB config, indicator definitions
 │   ├── app/
 │   │   ├── main.py         # Streamlit dashboard
