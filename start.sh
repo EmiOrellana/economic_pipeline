@@ -12,5 +12,8 @@ python setup_db.py
 echo "Running pipeline..."
 python src/run_pipeline.py
 
+echo "Starting cron..."
+cron
+
 echo "Starting dashboard..."
 streamlit run src/app/main.py --server.port 8501 --server.address 0.0.0.0

@@ -16,6 +16,8 @@ FRED API ──────────┐
 Alpha Vantage API ─┘
 ```
 
+The pipeline runs automatically every day at midnight via a Cron scheduler inside the Docker container, keeping the data fresh without manual intervention.
+
 **Indicators tracked:**
 | Symbol | Name | Source | Unit |
 |---|---|---|---|
@@ -42,7 +44,7 @@ Alpha Vantage API ─┘
 - **pandas** — data transformation
 - **psycopg2** — PostgreSQL adapter
 - **Docker & Docker Compose** — containerized deployment
-- **Cron** — pipeline scheduling
+- **Cron** — daily pipeline scheduling
 
 ---
 
@@ -51,12 +53,19 @@ Alpha Vantage API ─┘
 ```
 economic_pipeline/
 ├── run_pipeline.py         # Pipeline entry point
+├── setup_db.py             # Database schema setup
+├── start.sh                # Container startup script
+├── Dockerfile              # App container definition
+├── docker-compose.yml      # Multi-container orchestration
+├── crontab                 # Cron schedule definition
 ├── src/
 │   ├── config.py           # API keys, DB config, indicator definitions
 │   ├── app/
 │   │   ├── main.py         # Streamlit dashboard
 │   │   ├── queries.py      # DB read queries
 │   │   └── transforms.py   # Data transformations (Base 100, % change, resample)
+│   ├── db/
+│   │   └── connection.py   # PostgreSQL connection handler
 │   ├── extract/
 │   │   ├── fred.py         # FRED API extractor
 │   │   └── alpha_vantage.py # Alpha Vantage API extractor
@@ -66,9 +75,8 @@ economic_pipeline/
 │       └── load.py         # DB upsert logic
 ├── sql/
 │   └── create_tables.sql   # DB schema
-├── data/raw/               # Local cache for API responses
-├── .env.example            # Environment variable template
-└── docker-compose.yml      # Docker setup
+├── data/raw/               # Local cache for API responses (gitignored)
+└── .env.example            # Environment variable template
 ```
 
 ---
@@ -83,7 +91,7 @@ economic_pipeline/
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/economic_pipeline.git
+git clone https://github.com/EmiOrellana/economic_pipeline.git
 cd economic_pipeline
 ```
 
@@ -106,6 +114,8 @@ DB_USER=postgres
 DB_PASSWORD=your_password
 ```
 
+> **Note:** `DB_HOST=db` is the correct value for Docker. If running locally without Docker, change it to `localhost`.
+
 ### 3. Start the services
 
 ```bash
@@ -116,6 +126,7 @@ This will:
 - Start a PostgreSQL container
 - Create the database schema automatically
 - Run the ETL pipeline to load initial data
+- Start the Cron scheduler for daily updates
 - Start the Streamlit dashboard
 
 ### 4. Open the dashboard
@@ -137,20 +148,20 @@ Use the sidebar to configure the chart:
 
 ---
 
-## Updating the Data
+## Data Updates
 
-To refresh the data manually:
+The pipeline runs automatically every day at midnight (UTC) via Cron. To trigger a manual update:
 
 ```bash
-docker compose run pipeline
+docker compose exec app python run_pipeline.py
 ```
 
-For automatic updates, the pipeline is scheduled via Cron inside the container.
+Pipeline logs are saved to `/var/log/pipeline.log` inside the container.
 
 ---
 
 ## Notes
 
-- Alpha Vantage free tier is limited to 25 API calls per day. The pipeline uses local JSON caching to avoid unnecessary requests during development.
+- Alpha Vantage free tier is limited to 25 API calls per day. The pipeline uses local JSON caching with a 24-hour TTL to avoid unnecessary requests.
 - FRED API is unlimited in practice.
 - Data starts from January 1, 2010.
