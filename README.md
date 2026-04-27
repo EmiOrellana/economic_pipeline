@@ -153,7 +153,7 @@ Use the sidebar to configure the chart:
 The pipeline runs automatically every day at midnight (UTC) via Cron. To trigger a manual update:
 
 ```bash
-docker compose exec app python run_pipeline.py
+docker compose exec app python src/run_pipeline.py
 ```
 
 Pipeline logs are saved to `/var/log/pipeline.log` inside the container.
@@ -164,4 +164,3 @@ Pipeline logs are saved to `/var/log/pipeline.log` inside the container.
 
 - Alpha Vantage free tier is limited to 25 API calls per day. The pipeline uses local JSON caching with a 24-hour TTL to avoid unnecessary requests.
 - FRED API is unlimited in practice.
-- Data starts from January 1, 2010.
