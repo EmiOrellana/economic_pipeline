@@ -2,6 +2,7 @@ import logging
 import os
 import requests
 import json
+import time
 from src.config import FRED_API_KEY
 
 
@@ -26,7 +27,7 @@ def get_fred_data(series_id: str, observation_start: str = '1776-07-04') -> dict
     path = f'data/raw/fred/{series_id}.json'
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
-    if os.path.exists(path):
+    if os.path.exists(path) and time.time() - os.path.getmtime(path) < 86400:
         logger.info(f"Using cached data for series_id: {series_id}")
         with open(path, 'r') as file:
             return json.load(file)

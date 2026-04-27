@@ -2,6 +2,7 @@ import logging
 import os
 import requests
 import json
+import time
 from src.config import ALPHA_VANTAGE_API_KEY
 
 
@@ -26,7 +27,7 @@ def get_commodities(function: str, interval: str = 'daily') -> dict | None:
     path = f'data/raw/alpha_vantage/{function}.json'
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
-    if os.path.exists(path):
+    if os.path.exists(path) and time.time() - os.path.getmtime(path) < 86400:
         logger.info(f"Using cached data for: {function}")
         with open(path, 'r') as file:
             return json.load(file)
@@ -72,7 +73,7 @@ def get_gold_silver(symbol: str, interval: str = 'daily') -> dict | None:
     path = f'data/raw/alpha_vantage/{symbol}_HISTORY.json'
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
-    if os.path.exists(path):
+    if os.path.exists(path) and time.time() - os.path.getmtime(path) < 86400:
         logger.info(f"Using cached data for: {symbol} HISTORY")
         with open(path, 'r') as file:
             return json.load(file)
