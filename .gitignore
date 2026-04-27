@@ -1,0 +1,17 @@
+# Entorno virtual
+venv/
+
+# Temp data
+data/
+*.egg-info/
+
+# Variables de entorno
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# VS Code
+.vscode/
