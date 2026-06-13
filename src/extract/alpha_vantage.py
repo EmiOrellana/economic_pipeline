@@ -13,12 +13,12 @@ url = 'https://www.alphavantage.co/query'
 def get_commodities(function: str, interval: str = 'daily') -> dict | None:
 
     """
-    Fetch data from the Alpha Vantage API for a specific series ID.
+    Fetch commodity data from the Alpha Vantage API for a specific function.
     Uses local cache if available, otherwise makes an API request and saves the response to a local file.
 
     Args:
-        series_id (str): The ID of the Alpha Vantage series to fetch.
-        observation_start (str): The start date for observations in 'YYYY-MM-DD' format. Default is '2010-01-01'.
+        function (str): The Alpha Vantage function to fetch (e.g. 'WTI', 'BRENT', 'CORN').
+        interval (str): The time interval for the data (e.g. 'daily', 'weekly', 'monthly'). Default is 'daily'.
 
     Returns:
         dict | None: The JSON response from the Alpha Vantage API as a dictionary, or None if an error occurs.
@@ -28,7 +28,7 @@ def get_commodities(function: str, interval: str = 'daily') -> dict | None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
     if os.path.exists(path) and time.time() - os.path.getmtime(path) < 86400:
-        logger.info(f"Using cached data for: {function}")
+        logger.info("Using cached data for: %s", function)
         with open(path, 'r') as file:
             return json.load(file)
 
@@ -44,14 +44,14 @@ def get_commodities(function: str, interval: str = 'daily') -> dict | None:
         response.raise_for_status()
 
     except requests.exceptions.RequestException as e:
-        logger.error(f"Error fetching data from Alpha Vantage API: {e}")
+        logger.error("Error fetching data from Alpha Vantage API: %s", e)
         return None
 
     raw_data = response.json()
 
     with open(path, 'w') as file:
         json.dump(raw_data, file)
-        logger.info(f"Imported data for: {function}")
+        logger.info("Imported data for: %s", function)
 
     return raw_data
 
@@ -74,7 +74,7 @@ def get_gold_silver(symbol: str, interval: str = 'daily') -> dict | None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
     if os.path.exists(path) and time.time() - os.path.getmtime(path) < 86400:
-        logger.info(f"Using cached data for: {symbol} HISTORY")
+        logger.info("Using cached data for: %s HISTORY", symbol)
         with open(path, 'r') as file:
             return json.load(file)
         
@@ -90,13 +90,13 @@ def get_gold_silver(symbol: str, interval: str = 'daily') -> dict | None:
         response.raise_for_status()
 
     except requests.exceptions.RequestException as e:
-        logger.error(f"Error fetching data from Alpha Vantage API: {e}")
+        logger.error("Error fetching data from Alpha Vantage API: %s", e)
         return None
     
     raw_data = response.json()
 
     with open(path, 'w') as file:
         json.dump(raw_data, file)
-        logger.info(f"Imported data for: {symbol} SPOT")
+        logger.info("Imported data for: %s HISTORY", symbol)
 
     return raw_data

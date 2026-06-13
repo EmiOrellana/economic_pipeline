@@ -22,9 +22,11 @@ The pipeline runs automatically every day at midnight via a Cron scheduler insid
 | Symbol | Name | Source | Unit |
 |---|---|---|---|
 | FEDFUNDS | Federal Funds Rate | FRED | Percent |
-| CPIAUCSL | Consumer Price Index | FRED | Index |
+| UNRATE | Unemployment Rate | FRED | Percent |
+| CPIAUCSL | Consumer Price Index (All Urban Consumers) | FRED | Index |
 | SP500 | S&P 500 Index | FRED | Index |
-| GDPC1 | Real GDP | FRED | Chained 2017 USD |
+| GDPC1 | Real Gross Domestic Product | FRED | Billions of Chained 2017 Dollars |
+| NASDAQCOM | NASDAQ Composite Index | FRED | Index |
 | WTI | West Texas Intermediate Crude Oil | Alpha Vantage | USD per Barrel |
 | BRENT | Brent Crude Oil | Alpha Vantage | USD per Barrel |
 | NATURAL_GAS | Natural Gas | Alpha Vantage | USD per MMBtu |
@@ -74,10 +76,19 @@ economic_pipeline/
 │   └── load/
 │       └── load.py         # DB upsert logic
 ├── sql/
-│   └── create_tables.sql   # DB schema
+│   └── schema.sql          # DB schema
 ├── data/raw/               # Local cache for API responses (gitignored)
 └── .env.example            # Environment variable template
 ```
+
+---
+
+## Engineering Decisions
+
+- **Idempotency:** The load step uses `UPSERT` logic via PostgreSQL `ON CONFLICT` constraints, so re-running the pipeline never creates duplicate rows or corrupts the dataset — each run safely refreshes existing observations instead of appending them.
+- **Resilience:** Each indicator is ingested inside its own atomic transaction with isolated logging and error handling. A failure in one source (API error, malformed payload) is logged and skipped without aborting the run, so partial ingestion degrades gracefully instead of crashing the whole pipeline.
+- **Efficient caching:** Raw API responses are cached locally with a 24-hour TTL, respecting the Alpha Vantage free-tier rate limit (25 calls/day) and avoiding redundant network calls on re-runs.
+- **Containerization:** The entire environment (PostgreSQL + ETL + Cron scheduler + dashboard) is fully reproducible via Docker Compose, with schema setup and initial data load handled automatically on startup.
 
 ---
 

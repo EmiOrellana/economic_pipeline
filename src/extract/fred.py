@@ -18,8 +18,8 @@ def get_fred_data(series_id: str, observation_start: str = '1776-07-04') -> dict
 
     Args:
         series_id (str): The ID of the FRED series to fetch.
-        observation_start (str): The start date for observations in 'YYYY-MM-DD' format. Default is '2010-01-01'.
-    
+        observation_start (str): The start date for observations in 'YYYY-MM-DD' format. Default is '1776-07-04', which effectively fetches the full available history.
+
     Returns:
         dict | None: The JSON response from the FRED API as a dictionary, or None if an error occurs.
     """
@@ -28,7 +28,7 @@ def get_fred_data(series_id: str, observation_start: str = '1776-07-04') -> dict
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
     if os.path.exists(path) and time.time() - os.path.getmtime(path) < 86400:
-        logger.info(f"Using cached data for series_id: {series_id}")
+        logger.info("Using cached data for series_id: %s", series_id)
         with open(path, 'r') as file:
             return json.load(file)
 
@@ -44,13 +44,13 @@ def get_fred_data(series_id: str, observation_start: str = '1776-07-04') -> dict
         response.raise_for_status()
         
     except requests.exceptions.RequestException as e:
-        logger.error(f"Error fetching data from FRED API: {e}")
+        logger.error("Error fetching data from FRED API: %s", e)
         return None    
     
     raw_data = response.json()
 
     with open(path, 'w') as file:
         json.dump(raw_data, file)
-        logger.info(f"Imported data for series_id: {series_id}")
+        logger.info("Imported data for series_id: %s", series_id)
 
     return raw_data
