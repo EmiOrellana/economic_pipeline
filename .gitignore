@@ -3,6 +3,7 @@ venv/
 
 # Temp data
 data/
+docs/
 *.egg-info/
 
 # Variables de entorno
@@ -12,6 +13,7 @@ data/
 __pycache__/
 *.pyc
 *.pyo
+.claude/
 
 # VS Code
 .vscode/
