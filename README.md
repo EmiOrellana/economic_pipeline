@@ -1,12 +1,35 @@
+<div align="center">
+
 # Economic Indicators Dashboard
 
-> **Portfolio Project** — A production-style data engineering project that tracks key macroeconomic and financial indicators through a fully automated ETL pipeline and an interactive dashboard.
+**An automated ETL pipeline for macroeconomic and financial indicators.**
+
+Pulls 13 indicators from two public APIs, normalizes them, loads them into PostgreSQL
+and serves them through an interactive dashboard — the whole stack reproducible with
+one Docker Compose command and refreshed nightly without manual intervention.
+
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![pandas](https://img.shields.io/badge/pandas-transform-150458?logo=pandas&logoColor=white)](https://pandas.pydata.org/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-dashboard-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![Plotly](https://img.shields.io/badge/Plotly-charts-3F4F75?logo=plotly&logoColor=white)](https://plotly.com/python/)
+
+<img src="docs/screenshots/02-single-indicator.png" alt="Economic Indicators Dashboard showing the Federal Funds Rate" width="850">
+
+</div>
 
 ---
 
-## Overview
+## Why
 
-This project pulls data from two public financial APIs, processes and stores it in a relational database, and exposes it through an interactive web dashboard. The goal is to demonstrate a real-world data engineering workflow — from raw API responses to a queryable database to a visual interface.
+Macroeconomic and financial indicators live scattered across public APIs, each with its
+own format, frequency and rate limits. Collecting and cleaning them by hand means
+repeating the same work every time, and the data goes stale the moment you stop.
+
+This project builds the full shape of a data pipeline rather than a script that downloads
+a CSV: extractors per source with local caching, a normalization layer, idempotent loads
+into PostgreSQL, and a dashboard that reads from the database instead of from the APIs.
 
 **End-to-end flow:**
 
@@ -16,9 +39,8 @@ FRED API ──────────┐
 Alpha Vantage API ─┘
 ```
 
-The pipeline runs automatically every day at midnight via a Cron scheduler inside the Docker container, keeping the data fresh without manual intervention.
+## Indicators
 
-**Indicators tracked:**
 | Symbol | Name | Source | Unit |
 |---|---|---|---|
 | FEDFUNDS | Federal Funds Rate | FRED | Percent |
@@ -35,84 +57,72 @@ The pipeline runs automatically every day at midnight via a Cron scheduler insid
 | GOLD | Gold | Alpha Vantage | USD per Ounce |
 | SILVER | Silver | Alpha Vantage | USD per Ounce |
 
----
+A full load reaches roughly 60,000 observations, with the oldest FRED series going back
+to 1947.
 
-## Tech Stack
-
-- **Python** — ETL pipeline, data transformation, dashboard
-- **PostgreSQL** — relational storage for indicators and observations
-- **Streamlit** — interactive web dashboard
-- **Plotly** — interactive charts
-- **pandas** — data transformation
-- **psycopg2** — PostgreSQL adapter
-- **Docker & Docker Compose** — containerized deployment
-- **Cron** — daily pipeline scheduling
-
----
-
-## Project Architecture
+## Architecture
 
 ```
 economic_pipeline/
 ├── setup_db.py             # Database schema setup
-├── start.sh                # Container startup script
+├── start.sh                # Container startup sequence
 ├── Dockerfile              # App container definition
 ├── docker-compose.yml      # Multi-container orchestration
-├── crontab                 # Cron schedule definition
-├── src/
-│   ├── run_pipeline.py     # Pipeline entry point
-│   ├── config.py           # API keys, DB config, indicator definitions
-│   ├── app/
-│   │   ├── main.py         # Streamlit dashboard
-│   │   ├── queries.py      # DB read queries
-│   │   └── transforms.py   # Data transformations (Base 100, % change, resample)
-│   ├── db/
-│   │   └── connection.py   # PostgreSQL connection handler
-│   ├── extract/
-│   │   ├── fred.py         # FRED API extractor
-│   │   └── alpha_vantage.py # Alpha Vantage API extractor
-│   ├── transform/
-│   │   └── transform.py    # Raw data cleaning and normalization
-│   └── load/
-│       └── load.py         # DB upsert logic
-├── sql/
-│   └── schema.sql          # DB schema
-├── data/raw/               # Local cache for API responses (gitignored)
-└── .env.example            # Environment variable template
+├── crontab                 # Nightly schedule
+├── sql/schema.sql          # Tables and constraints
+└── src/
+    ├── run_pipeline.py     # Pipeline entry point
+    ├── config.py           # API keys, DB config, indicator definitions
+    ├── extract/            # FRED and Alpha Vantage extractors (with caching)
+    ├── transform/          # Cleaning and normalization
+    ├── load/               # Upsert logic
+    ├── db/connection.py    # PostgreSQL connection handler
+    └── app/                # Streamlit dashboard, queries and transformations
 ```
 
----
+### Pipeline stages
 
-## Engineering Decisions
+| Stage | What happens |
+|---|---|
+| **Extract** | Extractors pull each indicator from FRED or Alpha Vantage, caching raw JSON with a 24-hour TTL and pausing between calls to respect rate limits. |
+| **Transform** | Payloads from two sources that agree on almost nothing are cleaned into a common schema: consistent dates, units and symbols. |
+| **Load** | Observations are upserted via `ON CONFLICT`, one atomic transaction per indicator. |
+| **Bootstrap** | On startup the container waits for PostgreSQL, applies the schema and runs a first full load. |
+| **Schedule** | Cron re-runs the pipeline nightly, reading credentials from an environment snapshot written at startup. |
+| **Serve** | The dashboard queries the database with Base-100, percentage-change and resampling transformations. |
 
-- **Idempotency:** The load step uses `UPSERT` logic via PostgreSQL `ON CONFLICT` constraints, so re-running the pipeline never creates duplicate rows or corrupts the dataset — each run safely refreshes existing observations instead of appending them.
-- **Resilience:** Each indicator is ingested inside its own atomic transaction with isolated logging and error handling. A failure in one source (API error, malformed payload) is logged and skipped without aborting the run, so partial ingestion degrades gracefully instead of crashing the whole pipeline.
-- **Efficient caching:** Raw API responses are cached locally with a 24-hour TTL, respecting the Alpha Vantage free-tier rate limit (25 calls/day) and avoiding redundant network calls on re-runs.
-- **Containerization:** The entire environment (PostgreSQL + ETL + Cron scheduler + dashboard) is fully reproducible via Docker Compose, with schema setup and initial data load handled automatically on startup.
+### Engineering decisions
 
----
+| Decision | Rationale |
+|---|---|
+| **Idempotent loads** (`ON CONFLICT`) | Re-running never duplicates rows or corrupts the dataset. "Run it again" is always a valid answer to a failure. |
+| **One transaction per indicator** | Each indicator is ingested atomically with isolated error handling, so a malformed payload from one source costs that source, not the whole run. |
+| **24-hour response cache** | Respects Alpha Vantage's 25-calls/day free tier and makes development possible — without it, every re-run would burn the daily budget. |
+| **Environment snapshot for cron** | Cron starts with a minimal environment and inherits neither the container's credentials nor its PATH, so `start.sh` writes what the job needs to `/app/cron.env` for it to source. |
+| **Full containerization** | Database, ETL, scheduler and dashboard come up together and reproduce anywhere with one command. |
 
 ## Setup
 
 ### Prerequisites
-- [Docker](https://www.docker.com/) and Docker Compose installed
+
+- [Docker](https://www.docker.com/) and Docker Compose
 - A free API key from [FRED](https://fred.stlouisfed.org/docs/api/api_key.html)
 - A free API key from [Alpha Vantage](https://www.alphavantage.co/support/#api-key)
 
-### 1. Clone the repository
+### 1. Clone
 
 ```bash
 git clone https://github.com/EmiOrellana/economic_pipeline.git
 cd economic_pipeline
 ```
 
-### 2. Configure environment variables
+### 2. Configure
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` and fill in your credentials:
+Fill in your credentials:
 
 ```env
 FRED_API_KEY=your_fred_api_key
@@ -125,53 +135,58 @@ DB_USER=postgres
 DB_PASSWORD=your_password
 ```
 
-> **Note:** `DB_HOST=db` is the correct value for Docker. If running locally without Docker, change it to `localhost`.
+`DB_HOST=db` is the correct value for Docker. Running locally without Docker, use `localhost`.
 
-### 3. Start the services
+### 3. Start
 
 ```bash
 docker compose up --build
 ```
 
-This will:
-- Start a PostgreSQL container
-- Create the database schema automatically
-- Run the ETL pipeline to load initial data
-- Start the Cron scheduler for daily updates
-- Start the Streamlit dashboard
+This starts PostgreSQL, creates the schema, runs the initial load, starts the cron
+scheduler and serves the dashboard.
 
-### 4. Open the dashboard
+### 4. Open
 
-Navigate to [http://localhost:8501](http://localhost:8501)
-
----
+[http://localhost:8501](http://localhost:8501)
 
 ## Usage
 
-Use the sidebar to configure the chart:
+The sidebar controls the chart:
 
-- **Select indicators** — choose one or more indicators to display
-- **Date range** — filter observations by start and end date
-- **Transformation** — view absolute values, Base 100 index, or percentage change
-- **Resample interval** — aggregate data by day, month, quarter, or year
+- **Select indicators** — one or more series to display
+- **Date range** — filter observations
+- **Transformation** — absolute values, Base 100 index, or percentage change
+- **Resample interval** — day, month, quarter or year
 
-> **Note:** When mixing indicators with different units in "Absolute values" mode, the dashboard will suggest switching to Base 100 or Percentage change for a meaningful comparison.
+Mixing indicators with different units in absolute mode triggers a warning suggesting
+Base 100 or percentage change, because a policy rate and an equity index share no scale.
 
----
+## Data updates
 
-## Data Updates
-
-The pipeline runs automatically every day at midnight (UTC) via Cron. To trigger a manual update:
+The pipeline runs nightly at midnight (UTC) via cron. To trigger a manual update:
 
 ```bash
 docker compose exec app python src/run_pipeline.py
 ```
 
-Pipeline logs are saved to `/var/log/pipeline.log` inside the container.
+Logs are written to `/var/log/pipeline.log` inside the container.
 
----
+## Limitations
+
+- The dashboard is the visual endpoint of the pipeline, not an analysis tool. The
+  indicators were chosen to exercise two different APIs, not because they form a
+  coherent analytical set — Base 100 makes them plottable together, which is not the
+  same as comparable.
+- No automated tests; correctness has been verified by inspecting loaded data.
+- Cron inside the container is the right size here but it is not an orchestrator: no
+  retries, no dependency graph, no visibility into a failed run beyond the log file.
+- No selective backfill — the pipeline refetches an indicator's full history rather than
+  reconciling a date range.
+- Alpha Vantage's free tier is a hard ceiling at 25 calls per day.
 
 ## Notes
 
-- Alpha Vantage free tier is limited to 25 API calls per day. The pipeline uses local JSON caching with a 24-hour TTL to avoid unnecessary requests.
-- FRED API is unlimited in practice.
+- FRED is effectively unlimited in practice; Alpha Vantage is not, which is what the
+  local cache exists for.
+- Raw API responses are cached under `data/raw/` (gitignored).

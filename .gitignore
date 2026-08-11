@@ -3,7 +3,6 @@ venv/
 
 # Temp data
 data/
-docs/
 *.egg-info/
 
 # Variables de entorno
