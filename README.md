@@ -5,8 +5,8 @@
 **An automated ETL pipeline for macroeconomic and financial indicators.**
 
 Pulls 13 indicators from two public APIs, normalizes them, loads them into PostgreSQL
-and serves them through an interactive dashboard — the whole stack reproducible with
-one Docker Compose command and refreshed nightly without manual intervention.
+and serves them through an interactive dashboard. The whole stack is reproducible with
+one Docker Compose command and refreshes nightly without manual intervention.
 
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
@@ -97,7 +97,7 @@ economic_pipeline/
 |---|---|
 | **Idempotent loads** (`ON CONFLICT`) | Re-running never duplicates rows or corrupts the dataset. "Run it again" is always a valid answer to a failure. |
 | **One transaction per indicator** | Each indicator is ingested atomically with isolated error handling, so a malformed payload from one source costs that source, not the whole run. |
-| **24-hour response cache** | Respects Alpha Vantage's 25-calls/day free tier and makes development possible — without it, every re-run would burn the daily budget. |
+| **24-hour response cache** | Respects Alpha Vantage's 25-calls/day free tier and makes development possible: without it, every re-run would burn the daily budget. |
 | **Environment snapshot for cron** | Cron starts with a minimal environment and inherits neither the container's credentials nor its PATH, so `start.sh` writes what the job needs to `/app/cron.env` for it to source. |
 | **Full containerization** | Database, ETL, scheduler and dashboard come up together and reproduce anywhere with one command. |
 
@@ -154,10 +154,10 @@ scheduler and serves the dashboard.
 
 The sidebar controls the chart:
 
-- **Select indicators** — one or more series to display
-- **Date range** — filter observations
-- **Transformation** — absolute values, Base 100 index, or percentage change
-- **Resample interval** — day, month, quarter or year
+- **Select indicators**: one or more series to display
+- **Date range**: filter observations
+- **Transformation**: absolute values, Base 100 index, or percentage change
+- **Resample interval**: day, month, quarter or year
 
 Mixing indicators with different units in absolute mode triggers a warning suggesting
 Base 100 or percentage change, because a policy rate and an equity index share no scale.
@@ -176,12 +176,12 @@ Logs are written to `/var/log/pipeline.log` inside the container.
 
 - The dashboard is the visual endpoint of the pipeline, not an analysis tool. The
   indicators were chosen to exercise two different APIs, not because they form a
-  coherent analytical set — Base 100 makes them plottable together, which is not the
+  coherent analytical set. Base 100 makes them plottable together, which is not the
   same as comparable.
 - No automated tests; correctness has been verified by inspecting loaded data.
 - Cron inside the container is the right size here but it is not an orchestrator: no
   retries, no dependency graph, no visibility into a failed run beyond the log file.
-- No selective backfill — the pipeline refetches an indicator's full history rather than
+- No selective backfill: the pipeline refetches an indicator's full history rather than
   reconciling a date range.
 - Alpha Vantage's free tier is a hard ceiling at 25 calls per day.
 
