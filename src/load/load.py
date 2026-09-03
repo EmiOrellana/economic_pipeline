@@ -1,25 +1,28 @@
 import logging
 import pandas as pd
-import psycopg2
-
+import psycopg2.extras
 
 logger = logging.getLogger(__name__)
 
 UPSERT_INDICATOR_QUERY = """
-INSERT INTO indicators (indicator_symbol, indicator_name, indicator_source, indicator_unit)
-VALUES (%s, %s, %s, %s)
+INSERT INTO indicators (indicator_symbol, indicator_name, indicator_source, indicator_unit, category, frequency)
+VALUES (%s, %s, %s, %s, %s, %s)
 ON CONFLICT (indicator_symbol, indicator_name)
 DO UPDATE SET
     indicator_source = EXCLUDED.indicator_source,
-    indicator_unit = EXCLUDED.indicator_unit;
+    indicator_unit = EXCLUDED.indicator_unit,
+    category = EXCLUDED.category,
+    frequency = EXCLUDED.frequency;
 """
 
 UPSERT_OBSERVATION_QUERY = """
 INSERT INTO observations (date, indicator_id, value)
-VALUES (%s, %s, %s)
+VALUES %s
 ON CONFLICT (date, indicator_id)
 DO UPDATE SET 
-    value = EXCLUDED.value;
+    value = EXCLUDED.value,
+    loaded_at = NOW()
+WHERE observations.value IS DISTINCT FROM EXCLUDED.value;
 """
 
 
@@ -39,7 +42,9 @@ def load_indicators(conn, indicators: list) -> None:
             indicator["indicator_symbol"],
             indicator["indicator_name"],
             indicator["indicator_source"],
-            indicator["indicator_unit"]
+            indicator["indicator_unit"],
+            indicator["category"],
+            indicator["frequency"]
         ) 
         for indicator in indicators
     ]
@@ -110,7 +115,7 @@ def load_observations(conn, indicator_id: int, df: pd.DataFrame) -> None:
 
     try:
         with conn.cursor() as cursor:
-            cursor.executemany(UPSERT_OBSERVATION_QUERY, records)
+            psycopg2.extras.execute_values(cursor, UPSERT_OBSERVATION_QUERY, records, page_size=1000)
 
     except psycopg2.DatabaseError as e:
         logger.error("Error loading observations: %s", e)

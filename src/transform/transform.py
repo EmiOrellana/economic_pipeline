@@ -27,8 +27,7 @@ def transform_fred_data(raw_data: dict) -> pd.DataFrame | None:
         df = df[['date', 'value']]
         df['date'] = pd.to_datetime(df['date'])
         df['value'] = pd.to_numeric(df['value'], errors='coerce')
-        df['value'] = df['value'].ffill()
-        df = df.dropna(subset=['value'])  # Drop leading rows with no value to carry forward
+        df = df.dropna(subset=['value'])
 
     except KeyError as e:
         logger.error("Unexpected data format, missing key: %s", e)
@@ -75,8 +74,7 @@ def transform_alpha_vantage_data(raw_data: dict) -> pd.DataFrame | None:
 
         df['date'] = pd.to_datetime(df['date'])
         df['value'] = pd.to_numeric(df['value'], errors='coerce')
-        df['value'] = df['value'].ffill()
-        df = df.dropna(subset=['value'])  # Drop leading rows with no value to carry forward
+        df = df.dropna(subset=['value'])
 
     except KeyError as e:
         logger.error("Unexpected data format, missing key: %s", e)
