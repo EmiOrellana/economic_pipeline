@@ -6,7 +6,7 @@ from src.config import INDICATORS
 from src.extract.fred import get_fred_data
 from src.extract.alpha_vantage import get_commodities, get_gold_silver
 from src.load.load import load_indicators, get_indicator_id, load_observations
-from src.transform.transform import transform_fred_data, transform_alpha_vantage_data
+from src.parse.parse import parse_fred_data, parse_alpha_vantage_data
 from src.db.connection import get_db_connection
 
 
@@ -14,12 +14,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def get_transformed_data(indicator: dict) -> pd.DataFrame | None:
+def get_parsed_data(indicator: dict) -> pd.DataFrame | None:
 
     """
-    Fetch and transform data based on the indicator source and symbol.
+    Fetch and parse data based on the indicator source and symbol.
 
-    Returns the transformed data or None if the transformation fails.
+    Returns the parsed data or None if the parsing fails.
     """
 
     source = indicator["indicator_source"]
@@ -27,14 +27,14 @@ def get_transformed_data(indicator: dict) -> pd.DataFrame | None:
 
     if source == "FRED":
         raw_data = get_fred_data(symbol)
-        return transform_fred_data(raw_data)
+        return parse_fred_data(raw_data)
 
     elif source == "ALPHA_VANTAGE":
         if symbol == "GOLD_SILVER_HISTORY":
             raw_data = get_gold_silver(indicator["symbol"])
         else:
             raw_data = get_commodities(symbol)
-        return transform_alpha_vantage_data(raw_data)
+        return parse_alpha_vantage_data(raw_data)
 
     else:
         logger.warning(
@@ -61,10 +61,10 @@ def run_pipeline():
                         name, 
                         symbol)
 
-            # Fetch and transform data (no DB interaction, outside transaction)
-            transformed_data = get_transformed_data(indicator)
+            # Fetch and parse data (no DB interaction, outside transaction)
+            parsed_data = get_parsed_data(indicator)
 
-            if transformed_data is None:
+            if parsed_data is None:
                 logger.warning(
                     "No data to load for %s (%s). Skipping.", 
                     name, 
@@ -77,7 +77,7 @@ def run_pipeline():
             try:
                 with conn:
                     indicator_id = get_indicator_id(conn, name)
-                    load_observations(conn, indicator_id, transformed_data)
+                    load_observations(conn, indicator_id, parsed_data)
                 logger.info(
                     "Loaded observations for %s (%s) into the database.", 
                     name, 

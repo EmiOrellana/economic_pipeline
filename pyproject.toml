@@ -16,3 +16,6 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["."]
+
+[project.optional-dependencies]
+dbt = ["dbt-postgres"]

@@ -5,7 +5,7 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-def transform_fred_data(raw_data: dict) -> pd.DataFrame | None:
+def parse_fred_data(raw_data: dict) -> pd.DataFrame | None:
 
     """
     Transforms raw FRED API data into a pandas DataFrame.
@@ -42,7 +42,7 @@ def transform_fred_data(raw_data: dict) -> pd.DataFrame | None:
     return df
 
 
-def transform_alpha_vantage_data(raw_data: dict) -> pd.DataFrame | None:
+def parse_alpha_vantage_data(raw_data: dict) -> pd.DataFrame | None:
 
     """
     Transforms raw Alpha Vantage API data into a pandas DataFrame.
@@ -84,7 +84,6 @@ def transform_alpha_vantage_data(raw_data: dict) -> pd.DataFrame | None:
         logger.error("Error processing data: %s", e)
         return None
     
-    logger.info("Transformed Alpha Vantage data:\n%s", df.head())
+    logger.info("Parsed Alpha Vantage data:\n%s", df.head())
 
     return df
-

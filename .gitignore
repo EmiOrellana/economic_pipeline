@@ -1,11 +1,11 @@
-# Entorno virtual
+# Python virtual environment
 venv/
 
 # Temp data
 data/
 *.egg-info/
 
-# Variables de entorno
+# Environment variables
 .env
 
 # Python
@@ -24,3 +24,9 @@ __pycache__/
 *.log
 
 CLAUDE.md
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+dbt/.user.yml
