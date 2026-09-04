@@ -65,7 +65,11 @@ def run_pipeline():
             transformed_data = get_transformed_data(indicator)
 
             if transformed_data is None:
-                logger.warning("No data to load for %s. Skipping.", symbol)
+                logger.warning(
+                    "No data to load for %s (%s). Skipping.", 
+                    name, 
+                    symbol
+                )
                 continue
 
             # Atomic transaction per indicator:
@@ -75,16 +79,20 @@ def run_pipeline():
                     indicator_id = get_indicator_id(conn, name)
                     load_observations(conn, indicator_id, transformed_data)
                 logger.info(
-                    "Loaded observations for %s into the database.", symbol
+                    "Loaded observations for %s (%s) into the database.", 
+                    name, 
+                    symbol
                 )
 
             except Exception as e:
                 # The context manager already did rollback.
                 # Log and continue with the next indicator.
                 logger.error(
-                    "Failed to load observations for %s: %s",
+                    "Failed to load observations for %s (%s) into the database: %s",
+                    name,
                     symbol,
                     e,
+                    exc_info=True
                 )
 
             if i > 0:
