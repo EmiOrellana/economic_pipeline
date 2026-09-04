@@ -4,6 +4,54 @@ sources:
   - name: raw
     schema: public
     tables:
+
       - name: indicators
+        columns:
+          - name: indicator_id
+            data_tests:
+              - unique
+              - not_null
+          - name: indicator_name
+            data_tests:
+              - unique
+              - not_null
+          - name: category
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ['macro', 'financial', 'commodity']
+          - name: frequency
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ['daily', 'business_daily', 'monthly', 'quarterly']
+
       - name: observations
         loaded_at_field: loaded_at
+        data_tests:
+          - dbt_utils.unique_combination_of_columns:
+              arguments:
+                combination_of_columns: [date, indicator_id]
+        columns:
+          - name: date
+            data_tests:
+              - not_null
+              - dbt_utils.expression_is_true:
+                  arguments:
+                    expression: "<= current_date"
+          - name: indicator_id
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('raw', 'indicators')
+                    field: indicator_id
+          - name: value
+            data_tests:
+              - not_null
+          - name: loaded_at
+            data_tests:
+              - not_null
+          
