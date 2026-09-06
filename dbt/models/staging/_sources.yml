@@ -4,7 +4,6 @@ sources:
   - name: raw
     schema: public
     tables:
-
       - name: indicators
         columns:
           - name: indicator_id
@@ -22,6 +21,10 @@ sources:
                   arguments:
                     values: ['macro', 'financial', 'commodity']
           - name: frequency
+            description: >
+              Native publication frequency. business_daily is separate from
+              daily because gold and silver quote on weekends while the equity
+              indices and energy series only trade Monday to Friday.
             data_tests:
               - not_null
               - accepted_values:
@@ -36,6 +39,10 @@ sources:
                 combination_of_columns: [date, indicator_id]
         columns:
           - name: date
+            description: >
+              Period the observation refers to. Monthly and quarterly series are
+              stamped on the first day of the period, following the FRED
+              convention: Q3 2025 is 2025-07-01, not 2025-09-30.
             data_tests:
               - not_null
               - dbt_utils.expression_is_true:
@@ -52,6 +59,10 @@ sources:
             data_tests:
               - not_null
           - name: loaded_at
+            description: >
+              When this row was last written, as opposed to `date`, which is what
+              the value refers to. The upsert only touches it when the value
+              actually changed, so it marks revisions rather than pipeline runs.
             data_tests:
               - not_null
           

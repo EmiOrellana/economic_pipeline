@@ -1,0 +1,104 @@
+version: 2
+
+models:
+  - name: mart_observations
+    description: >
+      One row per indicator, grain and period. Every series is stacked at each
+      grain equal to or coarser than its native frequency, so the dashboard
+      filters on `grain` instead of resampling at query time. Change metrics are
+      precomputed here because they depend on the series and the grain, not on
+      the window the user is looking at.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [indicator_id, grain, observation_date]
+    columns:
+      - name: indicator_id
+        description: Foreign key to mart_indicators.
+        data_tests:
+          - not_null
+      - name: indicator_name
+        description: Display name, denormalised so the dashboard needs no join.
+      - name: indicator_unit
+        description: >
+          Unit of `value` as published by the source. Drives how change metrics
+          are labelled: series measured in Percent take `*_change` as percentage
+          points, the rest take `*_pct`.
+      - name: category
+        description: "macro, financial or commodity. Groups the dashboard selector."
+      - name: frequency
+        description: >
+          Native publication frequency of the series: daily, business_daily,
+          monthly or quarterly. Determines which grains the series appears at.
+      - name: grain
+        description: >
+          Resampling level: day, month, quarter or year. A series is never
+          upsampled, so quarterly GDP has no daily or monthly rows.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['day', 'month', 'quarter', 'year']
+      - name: observation_date
+        description: >
+          First day of the period, following the FRED convention: Q3 2025 is
+          stamped 2025-07-01, not 2025-09-30.
+        data_tests:
+          - not_null
+      - name: value
+        description: >
+          Last observation within the period. These series are levels, rates and
+          prices, so the period value is its close; summing or averaging them
+          would change what the series measures.
+        data_tests:
+          - not_null
+      - name: pop_change
+        description: >
+          Absolute change against the previous period at this grain, in the
+          series' own unit. Percentage points where the unit is Percent.
+      - name: pop_pct
+        description: Percentage change against the previous period at this grain.
+      - name: yoy_change
+        description: >
+          Absolute change against the same period one year earlier, in the
+          series' own unit. Null at day grain.
+      - name: yoy_pct
+        description: >
+          Percentage change against the same period one year earlier: 12 rows
+          back at month grain, 4 at quarter, 1 at year. Null at day grain,
+          where a calendar year is not a fixed number of trading days.
+
+  - name: mart_indicators
+    description: >
+      One row per indicator. Feeds the dashboard selector and exposes the real
+      date range of each series, which the app needs to pick a base date that
+      exists in every series being compared.
+    columns:
+      - name: indicator_id
+        description: Primary key.
+        data_tests:
+          - not_null
+          - unique
+      - name: indicator_name
+        description: Display name shown in the selector.
+      - name: indicator_unit
+        description: Unit of measurement, shown next to the name in the selector.
+      - name: category
+        description: "macro, financial or commodity. Groups the selector."
+        data_tests:
+          - not_null
+      - name: frequency
+        description: >
+          Native publication frequency. Determines which grains can be offered
+          for this series.
+        data_tests:
+          - not_null
+      - name: start_date
+        description: >
+          First observation actually loaded, derived rather than declared. FRED
+          serves SP500 as a rolling ten-year window, so a hardcoded start date
+          goes stale on its own.
+      - name: end_date
+        description: Most recent observation loaded.
+      - name: observation_count
+        description: Number of raw observations behind the series.
