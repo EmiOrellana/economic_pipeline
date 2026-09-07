@@ -27,8 +27,13 @@ st.set_page_config(
 )
 
 st.title("Economic Indicators Dashboard")
-st.write("Use the sidebar to select indicators, time interval and date range, and view the corresponding observations in the main area.")
-st.write("This project tracks key macroeconomic and financial indicators sourced from FRED and Alpha Vantage APIs, stored in a PostgreSQL database and updated automatically via a scheduled ETL pipeline.")
+st.write("Use the sidebar to select indicators, resampling level, date range and metric.")
+st.write(
+    "13 macroeconomic and financial series from the FRED and Alpha Vantage APIs, loaded "
+    "into Supabase and modelled with dbt. Every series is available at four resampling "
+    "levels with its change metrics precomputed, so the controls below filter rather "
+    "than recalculate. Refreshed daily by a scheduled GitHub Actions workflow."
+)
 
 st.sidebar.subheader("Filters")
 try:
