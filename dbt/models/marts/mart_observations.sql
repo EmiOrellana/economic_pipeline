@@ -1,11 +1,9 @@
+{{ config(pre_hook = "set statement_timeout = '5min'") }}
+
 with expanded_observations as (
     select 
         o.observation_date as source_date,
         indicator_id,
-        i.indicator_name,
-        i.indicator_unit,
-        i.category,
-        i.frequency,
         g.grain,
         o.value,
         date_trunc(g.grain, o.observation_date)::date as period_start
@@ -30,10 +28,6 @@ with expanded_observations as (
 collapsed_observation as (
     select distinct on (indicator_id, grain, period_start) 
         indicator_id,
-        indicator_name,
-        indicator_unit,
-        category,
-        frequency,
         grain,
         period_start as observation_date,
         value
@@ -55,15 +49,16 @@ previous_observation as (
 
 select 
     indicator_id,
-    indicator_name,
-    indicator_unit,
-    category,
-    frequency,
-    grain,
-    observation_date,
-    value,
-    value - prev_period_value as pop_change,
-    (value - prev_period_value) / nullif(prev_period_value, 0) * 100 as pop_pct,
-    value - prev_year_value as yoy_change,
-    (value - prev_year_value) / nullif(prev_year_value, 0) * 100 as yoy_pct
-from previous_observation
+    i.indicator_name,
+    i.indicator_unit,
+    i.category,
+    i.frequency,
+    p.grain,
+    p.observation_date,
+    p.value,
+    p.value - prev_period_value as pop_change,
+    (p.value - prev_period_value) / nullif(prev_period_value, 0) * 100 as pop_pct,
+    p.value - prev_year_value as yoy_change,
+    (p.value - prev_year_value) / nullif(prev_year_value, 0) * 100 as yoy_pct
+from previous_observation as p
+join {{ ref('stg_indicators') }} as i using (indicator_id)
