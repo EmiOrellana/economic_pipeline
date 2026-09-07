@@ -31,14 +31,14 @@ Macroeconomic and financial indicators live scattered across public APIs, each w
 own format, frequency and rate limits. Collecting and cleaning them by hand means
 repeating the same work every time, and the data goes stale the moment you stop.
 
-This is a portfolio project, written to practise the full shape of a data platform rather
-than a script that downloads a CSV: extractors per source with local caching, idempotent
-loads, a modelling layer that makes the series comparable, tests that assert what the
-schema cannot, and a dashboard that filters precomputed data instead of recomputing it on
-every click.
+This is a portfolio project, written to practise the full shape of a data platform:
+extractors per source with local caching, idempotent loads, a modelling layer that makes
+the series comparable, tests that assert what the schema cannot, and a dashboard that
+filters precomputed data instead of recomputing it on every click.
 
 The indicators publish at four different frequencies and in seven different units. Most
-of the engineering here exists to make that difference explicit instead of hiding it.
+of the engineering here exists to make that difference explicit, and most of the design
+decisions below follow from it.
 
 ### How it runs
 
@@ -108,8 +108,8 @@ being stored with the price from January 1992. The database held twelve years of
 corn prices that were, literally, a future value.
 
 Removing it also stopped inventing roughly 1,500 market-holiday observations across the
-daily series. Those gaps are now absent from the table, which is the honest
-representation: on a day the market was closed, there is no observation.
+daily series. The gaps are now absent from the table: on a day the market was closed,
+there is no observation.
 
 ### The category is a column, not a table
 
@@ -227,6 +227,22 @@ fails immediately instead of writing to the wrong place.
 
 Development happens against the local container on purpose: it costs no API quota, leaves
 the deployed data untouched, and works offline.
+
+### Metadata joins after the sort, not before
+
+Production runs on Supabase's free tier: a shared instance with 2 MB of `work_mem` and a
+two-minute `statement_timeout`. A scheduled build hit that ceiling and was cancelled
+mid-model.
+
+The query was not the problem: measured on the same instance while idle, it completes in
+about a second. It was carrying four text columns through the sort that collapses 231,000
+expanded rows, columns nothing reads until the final `SELECT`. Joining the indicator
+metadata *after* the window functions cut the sorted row from 100 bytes to 51, the
+temporary spill from 20.6 MB to 8.4 MB, and the query from 2.5s to 1.1s.
+
+A `pre_hook` raises `statement_timeout` to five minutes for that model. It makes nothing
+faster: it means an instance that is throttled at that moment produces a slow build
+instead of a failed one.
 
 ## Architecture
 
