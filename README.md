@@ -4,12 +4,12 @@
 
 **An automated ELT pipeline for macroeconomic and financial indicators.**
 
-Pulls 13 indicators from two public APIs, loads them raw into PostgreSQL, models them
-with dbt, and serves them through an interactive dashboard. It refreshes daily on
-GitHub Actions and runs identically against a local container or a managed cloud
-database.
+Pulls 13 indicators from the FRED and Alpha Vantage APIs, loads them raw into a
+**Supabase** PostgreSQL database, models them with **dbt** into query-ready marts, and
+serves them through a **Streamlit** dashboard. **GitHub Actions** refreshes the whole
+chain every morning, and the same code runs unchanged against a local Docker container.
 
-[**Live demo**](https://economicpipeline-eorellana.streamlit.app/)
+[![Live demo](https://img.shields.io/badge/Live%20demo-open%20the%20dashboard-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://economicpipeline-eorellana.streamlit.app/)
 
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
@@ -31,22 +31,39 @@ Macroeconomic and financial indicators live scattered across public APIs, each w
 own format, frequency and rate limits. Collecting and cleaning them by hand means
 repeating the same work every time, and the data goes stale the moment you stop.
 
-This project builds the full shape of a data platform rather than a script that downloads
-a CSV: extractors per source with local caching, idempotent loads into PostgreSQL, a
-modelling layer in dbt that makes the series comparable, tests that assert what the
+This is a portfolio project, written to practise the full shape of a data platform rather
+than a script that downloads a CSV: extractors per source with local caching, idempotent
+loads, a modelling layer that makes the series comparable, tests that assert what the
 schema cannot, and a dashboard that filters precomputed data instead of recomputing it on
 every click.
 
 The indicators publish at four different frequencies and in seven different units. Most
 of the engineering here exists to make that difference explicit instead of hiding it.
 
-**End-to-end flow:**
+### How it runs
 
 ```
-FRED API ──────────┐
-                   ├──► Extract + Load (Python) ──► PostgreSQL ──► dbt ──► Streamlit
-Alpha Vantage API ─┘         raw, untouched          public       analytics
+ FRED API ─────────┐    ┌──────────────────┐   ┌─────────────┐   ┌────────────┐
+                   ├───►│  Python          │──►│  Supabase   │──►│  Streamlit │
+                   │    │  extract + load  │   │             │   │    Cloud   │
+ Alpha Vantage ────┘    │  GitHub Actions  │   │  public ──► │   │  dashboard │
+                        │  daily 09:00 UTC │   │  analytics  │   │            │
+                        └──────────────────┘   └─────────────┘   └────────────┘
+                                                      ▲
+                                                     dbt
 ```
+
+A scheduled GitHub Actions workflow runs every morning. Python pulls each series from
+FRED or Alpha Vantage and upserts it, untouched, into the `public` schema of a **Supabase**
+database — managed PostgreSQL, so the same driver and the same SQL serve it and the local
+container alike.
+
+**dbt** then runs against that database and builds the `analytics` schema: staging views
+that type and rename, and marts that stack every series at four grains with their change
+metrics already computed. Transformation happens inside the warehouse, not on the way in.
+
+**Streamlit Community Cloud** serves the dashboard and reads only the marts, so a click
+is a `WHERE` clause rather than a recalculation.
 
 <div align="center">
 <img src="docs/screenshots/03-lineage-graph.png" alt="dbt lineage graph: two sources feeding two staging models and two marts" width="850">
@@ -208,8 +225,8 @@ connections and the local container has no TLS configured, so `dev` cannot reach
 production and `prod` cannot reach the local database. Crossing environments by accident
 fails immediately instead of writing to the wrong place.
 
-Development happens against the local container on purpose: it costs no API quota, keeps
-the data a recruiter sees untouched, and works offline.
+Development happens against the local container on purpose: it costs no API quota, leaves
+the deployed data untouched, and works offline.
 
 ## Architecture
 
@@ -324,15 +341,12 @@ load are still committed, since each indicator is its own transaction.
   are the natural next step.
 - **No Python tests.** Data quality is covered by 28 dbt tests; the parsing code, which
   handles three different JSON shapes, is not.
-- **Alpha Vantage's free tier is a hard ceiling** at roughly 25 calls per day. Seven of
-  them go to a single run, and the runner starts with an empty cache every time.
+- **Alpha Vantage's free tier is a hard ceiling** at roughly 25 calls per day, which is
+  what the local response cache exists to work around.
 - **The dashboard is the endpoint of a pipeline, not an analysis tool.** The indicators
   were chosen to exercise two APIs with different shapes, not because they form a coherent
   analytical set. Making series plottable together is not the same as making them
   comparable, which is why the unit warnings exist.
-- **The scheduled workflow needs the repository to stay alive.** GitHub disables cron
-  schedules in public repositories after about 60 days without activity, and Supabase
-  pauses a free project a week after that. GitHub warns by email before it happens.
 
 ## Notes
 
