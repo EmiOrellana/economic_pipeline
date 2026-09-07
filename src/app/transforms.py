@@ -1,76 +1,40 @@
 import pandas as pd
 
 
-def to_base_100(df: pd.DataFrame, value_col: str = 'value') -> pd.DataFrame:
+def to_base_100(df: pd.DataFrame, base_date) -> pd.DataFrame:
 
     """
-    Transforms the values in the specified column of the DataFrame to a base 100 index.
-    
+    Rebases every series to 100 at a single shared date.
+
+    The base is the same date for all series in the chart, not each series' own
+    first observation: two series starting at different times must not both be
+    drawn from 100 as if they had started together. Where a series has no row on
+    base_date, its first row after it is used, which costs at most a day.
+
     Parameters:
-    df (pandas.DataFrame): The input DataFrame containing the data to be transformed.
-    value_col (str): The name of the column containing the values to be transformed. Default is 'value'.
-    
+    df (pandas.DataFrame): observations, with observation_date, indicator_name
+        and value columns.
+    base_date: the date that becomes 100. Accepts anything pd.Timestamp reads.
+
     Returns:
-    pandas.DataFrame: A new DataFrame with the transformed values in a column named 'base_100_value'.
+    pandas.DataFrame: a copy with an added 'base_100_value' column. Series whose
+        base value is zero come back as NA rather than raising.
     """
 
     if df.empty:
         return df
-    
-    df = df.copy()
-    
-    first_values = df.groupby('indicator_name')[value_col].transform('first')
-    if any(first_values == 0):
-        raise ValueError("The base value for index calculation cannot be zero.")
 
-    df['base_100_value'] = df.groupby('indicator_name')[value_col].transform(lambda x: (x / x.iloc[0]) * 100)
+    df = df.copy()
+    df = df.sort_values(by='observation_date')
+
+    base_date = pd.Timestamp(base_date)
+    base_values = (
+        df[df['observation_date'] >= base_date]
+        .groupby('indicator_name')['value']
+        .first()
+        .replace(0, pd.NA)
+    )
+
+    df['base_100_value'] = df['value'] / df['indicator_name'].map(base_values) * 100
 
     return df
-
-
-def to_pct_change(df: pd.DataFrame, value_col: str = 'value') -> pd.DataFrame:
-
-    """
-    Transforms the values in the specified column of the DataFrame to percentage change.
-    
-    Parameters:
-    df (pandas.DataFrame): The input DataFrame containing the data to be transformed.
-    value_col (str): The name of the column containing the values to be transformed. Default is 'value'.
-    
-    Returns:
-    pandas.DataFrame: A new DataFrame with the transformed values in a column named 'pct_change_value'.
-    """
-
-    if df.empty:
-        return df
-
-    df = df.copy()
-
-    df['pct_change_value'] = df.groupby('indicator_name')[value_col].transform(lambda x: x.pct_change() * 100)
-
-    return df
-
-
-def to_resample(df: pd.DataFrame, interval: str, value_col: str = 'value') -> pd.DataFrame:
-
-    """
-    Resamples the DataFrame to the specified interval and calculates the last value.
-
-    Parameters:
-    interval (str): The resampling interval (e.g., 'ME' for monthly, 'QE' for quarterly, 'YE' for yearly).
-
-    Returns:
-    pandas.DataFrame: A DataFrame that contains the resampled values for each indicator.
-    """
-
-
-    if df.empty:
-        return df
-
-    df = df.copy()
-    df['date'] = pd.to_datetime(df['date'])
-    df.set_index('date', inplace=True)
-    resampled_df = df.groupby(['indicator_symbol', 'indicator_name', 'indicator_unit', 'display_unit']).resample(interval)[value_col].last().reset_index()
-
-    return resampled_df
-

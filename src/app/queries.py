@@ -1,6 +1,9 @@
 import logging
 import psycopg2
+
+import streamlit as st
 import pandas as pd
+
 from src.db.connection import get_db_connection
 from src.config import DB_CONFIG
 
@@ -8,23 +11,65 @@ from src.config import DB_CONFIG
 logger = logging.getLogger(__name__)
 
 GET_INDICATORS_QUERY = """
-SELECT * 
-FROM indicators
-ORDER BY indicator_name;
+SELECT 
+    indicator_id, 
+    indicator_name, 
+    indicator_unit, 
+    category, 
+    frequency, 
+    start_date, 
+    end_date,
+    available_grains 
+FROM analytics.mart_indicators
+ORDER BY category, indicator_name;
 """
 
 GET_OBSERVATIONS_QUERY = """
-SELECT o.date, i.indicator_symbol, i.indicator_name, i.indicator_unit, o.value
-FROM observations o
-JOIN indicators i ON o.indicator_id = i.indicator_id
-WHERE
-    o.date >= %s AND o.date <= %s
-    AND
-    i.indicator_id = ANY(%s)
-ORDER BY o.date;
+SELECT 
+    observation_date, 
+    indicator_name, 
+    indicator_unit,
+    value, 
+    pop_change, 
+    pop_pct, 
+    yoy_change, 
+    yoy_pct
+FROM analytics.mart_observations
+WHERE grain = %s
+    AND indicator_id = ANY(%s)
+    AND observation_date BETWEEN %s AND %s
+ORDER BY observation_date;
 """
 
+@st.cache_resource
+def _get_cached_connection():
+    return get_db_connection(DB_CONFIG)
 
+
+def _discard_connection(conn) -> None:
+
+    """
+    Leaves the cached connection usable after a failed query.
+
+    A failed statement aborts the transaction, so the connection rejects every
+    later query until it is rolled back. If it dropped altogether, the cached
+    object is dead and has to be discarded so the next call reconnects.
+    """
+
+    if conn is None:
+        return
+
+    if conn.closed:
+        _get_cached_connection.clear()
+        return
+
+    try:
+        conn.rollback()
+    except psycopg2.Error:
+        _get_cached_connection.clear()
+
+
+@st.cache_data(ttl=3600)
 def get_indicators() -> pd.DataFrame:
 
     """
@@ -34,22 +79,20 @@ def get_indicators() -> pd.DataFrame:
     conn = None
 
     try:
-        conn = get_db_connection(DB_CONFIG)
+        conn = _get_cached_connection()
         with conn.cursor() as cursor:
             cursor.execute(GET_INDICATORS_QUERY)
             data = cursor.fetchall()
             return pd.DataFrame(data, columns=[desc[0] for desc in cursor.description])
         
-    except psycopg2.DatabaseError as e:
-        logger.error("Error retrieving indicators: %s"  , e)
-        return pd.DataFrame(columns=["indicator_id", "indicator_name", "indicator_symbol"])
-    
-    finally:
-        if conn:
-            conn.close()
+    except psycopg2.Error as e:
+        logger.error("Error retrieving indicators: %s", e)
+        _discard_connection(conn)
+        raise
 
 
-def get_observations(start_date: str, end_date: str, indicator_ids: list[int]) -> pd.DataFrame:
+@st.cache_data(ttl=3600)
+def get_observations(grain: str, indicator_ids: list[int], start_date: str, end_date: str) -> pd.DataFrame:
     
     """
     Retrieves observations for the specified date range and indicator IDs from the database.
@@ -58,16 +101,19 @@ def get_observations(start_date: str, end_date: str, indicator_ids: list[int]) -
     conn = None
 
     try:
-        conn = get_db_connection(DB_CONFIG)
+        conn = _get_cached_connection()
         with conn.cursor() as cursor:
-            cursor.execute(GET_OBSERVATIONS_QUERY, (start_date, end_date, indicator_ids))
+            cursor.execute(GET_OBSERVATIONS_QUERY, (grain, indicator_ids, start_date, end_date))
             data = cursor.fetchall()
-            return pd.DataFrame(data, columns=[desc[0] for desc in cursor.description])
-        
-    except psycopg2.DatabaseError as e:
-        logger.error("Error retrieving observations: %s", e)
-        return pd.DataFrame(columns=["date", "indicator_symbol", "indicator_name", "indicator_unit", "value"])
+            df = pd.DataFrame(data, columns=[desc[0] for desc in cursor.description])
 
-    finally:
-        if conn:
-            conn.close()
+            numeric_columns = ["value", "pop_change", "pop_pct", "yoy_change", "yoy_pct"]
+            df["observation_date"] = pd.to_datetime(df["observation_date"])
+            df[numeric_columns] = df[numeric_columns].astype(float)
+
+            return df
+        
+    except psycopg2.Error as e:
+        logger.error("Error retrieving observations: %s", e)
+        _discard_connection(conn)
+        raise

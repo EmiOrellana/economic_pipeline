@@ -102,3 +102,9 @@ models:
         description: Most recent observation loaded.
       - name: observation_count
         description: Number of raw observations behind the series.
+      - name: available_grains
+        description: >
+          Grains this series actually has rows for in mart_observations,
+          derived rather than declared. The dashboard intersects these across
+          the selected series to decide which resampling levels to offer, so
+          the rule lives only in the mart and is never restated in the app.
