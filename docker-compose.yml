@@ -16,6 +16,15 @@ services:
       - "8501:8501"
     env_file:
       - .env
+    environment:
+      # The app container always talks to its sibling `db`, whatever the .env
+      # points at. Only the API keys and the password come from the file, so the
+      # same .env can serve host-side runs against Supabase.
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: economic_pipeline
+      DB_USER: postgres
+      DB_SSLMODE: disable
     depends_on:
       - db
 

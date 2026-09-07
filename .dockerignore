@@ -1,0 +1,22 @@
+# Secrets and local environment
+.env
+venv/
+
+# Version control and CI
+.git/
+.github/
+
+# Cached API responses: the container fetches its own
+data/
+
+# Build and runtime artifacts
+__pycache__/
+*.pyc
+*.egg-info/
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+logs/
+
+# Docs
+docs/
