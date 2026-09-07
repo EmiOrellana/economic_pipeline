@@ -12,7 +12,6 @@ data/
 __pycache__/
 *.pyc
 *.pyo
-.claude/
 
 # VS Code
 .vscode/
@@ -23,8 +22,6 @@ __pycache__/
 # Logs
 *.log
 logs/
-
-CLAUDE.md
 
 # dbt
 dbt/target/
