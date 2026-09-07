@@ -24,5 +24,7 @@ jobs:
           python-version: "3.12"
       - run: pip install ".[dbt]"
       - run: python src/run_pipeline.py
+      - run: dbt deps
+        working-directory: dbt
       - run: dbt build --target prod
         working-directory: dbt
