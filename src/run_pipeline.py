@@ -1,6 +1,6 @@
 import logging
 import pandas as pd
-from time import sleep
+
 from src.config import DB_CONFIG
 from src.config import INDICATORS
 from src.extract.fred import get_fred_data
@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def get_parsed_data(indicator: dict) -> pd.DataFrame | None:
+def _get_parsed_data(indicator: dict) -> pd.DataFrame | None:
 
     """
     Fetch and parse data based on the indicator source and symbol.
@@ -46,15 +46,17 @@ def get_parsed_data(indicator: dict) -> pd.DataFrame | None:
 
 
 def run_pipeline():
+
     logger.info("Starting the pipeline...")
     conn = None
+    failed = []
 
     try:
         conn = get_db_connection(DB_CONFIG)
         with conn:
             load_indicators(conn, INDICATORS)
 
-        for i, indicator in enumerate(INDICATORS):
+        for indicator in INDICATORS:
             symbol = indicator["indicator_symbol"]
             name = indicator["indicator_name"]
             logger.info("Processing indicator: %s (%s)", 
@@ -62,9 +64,10 @@ def run_pipeline():
                         symbol)
 
             # Fetch and parse data (no DB interaction, outside transaction)
-            parsed_data = get_parsed_data(indicator)
+            parsed_data = _get_parsed_data(indicator)
 
             if parsed_data is None:
+                failed.append(name)
                 logger.warning(
                     "No data to load for %s (%s). Skipping.", 
                     name, 
@@ -86,7 +89,8 @@ def run_pipeline():
 
             except Exception as e:
                 # The context manager already did rollback.
-                # Log and continue with the next indicator.
+                # Log, record the failure and continue with the next indicator.
+                failed.append(name)
                 logger.error(
                     "Failed to load observations for %s (%s) into the database: %s",
                     name,
@@ -94,19 +98,20 @@ def run_pipeline():
                     e,
                     exc_info=True
                 )
-
-            if i > 0:
-                logger.info(
-                    "Sleeping for 0.5 second to respect API rate limits..."
-                )
-                sleep(0.5)
+                
 
     except Exception as e:
         logger.error("Pipeline error: %s", e, exc_info=True)
+        raise
 
     finally:
         if conn:
             conn.close()
+
+    if failed:
+        raise RuntimeError(
+            f"{len(failed)} indicators failed: {', '.join(failed)}"
+        )
 
 
 if __name__ == "__main__":

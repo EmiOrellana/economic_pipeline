@@ -3,6 +3,7 @@ import os
 import requests
 import json
 import time
+
 from src.config import ALPHA_VANTAGE_API_KEY
 
 
@@ -39,6 +40,9 @@ def get_commodities(function: str, interval: str = 'daily') -> dict | None:
         'apikey': ALPHA_VANTAGE_API_KEY
     }
 
+    logger.info("Sleeping for 15 seconds to respect API rate limits...")
+    time.sleep(15)
+    
     try:
         response = requests.get(url, params=params)
         response.raise_for_status()
@@ -48,6 +52,13 @@ def get_commodities(function: str, interval: str = 'daily') -> dict | None:
         return None
 
     raw_data = response.json()
+
+    if 'data' not in raw_data:
+        logger.error(
+            "Alpha Vantage returned no data for %s: %s", function, raw_data
+        )
+        return None
+
 
     with open(path, 'w') as file:
         json.dump(raw_data, file)
@@ -85,6 +96,9 @@ def get_gold_silver(symbol: str, interval: str = 'daily') -> dict | None:
         'apikey': ALPHA_VANTAGE_API_KEY
     }
 
+    logger.info("Sleeping for 15 seconds to respect API rate limits...")
+    time.sleep(15)
+
     try:
         response = requests.get(url, params=params)
         response.raise_for_status()
@@ -95,6 +109,12 @@ def get_gold_silver(symbol: str, interval: str = 'daily') -> dict | None:
     
     raw_data = response.json()
 
+    if 'data' not in raw_data:
+        logger.error(
+            "Alpha Vantage returned no data for %s: %s", symbol, raw_data
+        )
+        return None
+    
     with open(path, 'w') as file:
         json.dump(raw_data, file)
         logger.info("Imported data for: %s HISTORY", symbol)
