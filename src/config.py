@@ -4,8 +4,20 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-FRED_API_KEY = os.getenv('FRED_API_KEY')
-ALPHA_VANTAGE_API_KEY = os.getenv('ALPHA_VANTAGE_API_KEY')
+
+def _get_secret(key: str, default: str | None = None) -> str | None:
+    value = os.getenv(key)
+    if value is not None:
+        return value
+    try:
+        import streamlit as st
+        return st.secrets[key]
+    except Exception:
+        return default
+
+
+FRED_API_KEY = _get_secret('FRED_API_KEY')
+ALPHA_VANTAGE_API_KEY = _get_secret('ALPHA_VANTAGE_API_KEY')
 
 INDICATORS = [
     {'indicator_symbol': 'FEDFUNDS', 'indicator_name': 'Federal Funds Rate', 'indicator_source': 'FRED',
@@ -37,10 +49,10 @@ INDICATORS = [
 ]
 
 DB_CONFIG = {
-    'host': os.getenv('DB_HOST'),
-    'port': os.getenv('DB_PORT'),
-    'database': os.getenv('DB_NAME'),
-    'user': os.getenv('DB_USER'),
-    'password': os.getenv('DB_PASSWORD'),
-    'sslmode': os.getenv('DB_SSLMODE', 'require')
+    'host': _get_secret('DB_HOST'),
+    'port': _get_secret('DB_PORT'),
+    'database': _get_secret('DB_NAME'),
+    'user': _get_secret('DB_USER'),
+    'password': _get_secret('DB_PASSWORD'),
+    'sslmode': _get_secret('DB_SSLMODE', 'require')
 }
