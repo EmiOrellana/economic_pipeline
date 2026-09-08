@@ -16,8 +16,8 @@ __pycache__/
 # VS Code
 .vscode/
 
-# Streamlit
-.streamlit/
+# Streamlit: keep config.toml tracked, it carries the theme
+.streamlit/secrets.toml
 
 # Logs
 *.log
