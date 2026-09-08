@@ -4,7 +4,7 @@
 
 **An automated ELT pipeline for macroeconomic and financial indicators.**
 
-Pulls 13 indicators from the FRED and Alpha Vantage APIs, loads them raw into a
+Portfolio project that pulls 13 indicators from the FRED and Alpha Vantage APIs, loads them raw into a
 **Supabase** PostgreSQL database, models them with **dbt** into query-ready marts, and
 serves them through a **Streamlit** dashboard. **GitHub Actions** refreshes the whole
 chain every morning, and the same code runs unchanged against a local Docker container.
