@@ -43,7 +43,18 @@ ORDER BY observation_date;
 
 @st.cache_resource
 def _get_cached_connection():
-    return get_db_connection(DB_CONFIG)
+
+    """
+    Returns the cached connection, in autocommit mode.
+
+    Without autocommit, psycopg2 opens a transaction on the first read and nothing
+    closes it: the cached connection then sits idle in transaction, holding a lock on
+    the marts that blocks dbt from swapping the tables during a build.
+    """
+
+    conn = get_db_connection(DB_CONFIG)
+    conn.autocommit = True
+    return conn
 
 
 def _discard_connection(conn) -> None:
