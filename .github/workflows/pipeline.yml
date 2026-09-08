@@ -1,4 +1,4 @@
-name: daily ingest
+name: daily pipeline
 
 on:
   schedule:
@@ -22,5 +22,9 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - run: pip install .
+      - run: pip install ".[dbt]"
       - run: python src/run_pipeline.py
+      - run: dbt deps
+        working-directory: dbt
+      - run: dbt build --target prod
+        working-directory: dbt
