@@ -1,4 +1,4 @@
-{{ config(pre_hook = "set statement_timeout = '5min'") }}
+{{ config(pre_hook = ["set work_mem = '16MB'", "set statement_timeout = '5min'"]) }}
 
 with expanded_observations as (
     select 

@@ -1,8 +1,8 @@
-name: daily ingest
+name: dbt transforms
 
 on:
   schedule:
-    - cron: "20 8 * * *"
+    - cron: "20 10 * * *"
   workflow_dispatch:
 
 jobs:
@@ -15,12 +15,13 @@ jobs:
       DB_USER: ${{ secrets.DB_USER }}
       DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
       DB_SSLMODE: ${{ secrets.DB_SSLMODE }}
-      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-      ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - run: pip install .
-      - run: python src/run_pipeline.py
+      - run: pip install ".[dbt]"
+      - run: dbt deps
+        working-directory: dbt
+      - run: dbt build --target prod
+        working-directory: dbt
