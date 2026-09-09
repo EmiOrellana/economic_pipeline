@@ -19,6 +19,9 @@ def _get_secret(key: str, default: str | None = None) -> str | None:
 FRED_API_KEY = _get_secret('FRED_API_KEY')
 ALPHA_VANTAGE_API_KEY = _get_secret('ALPHA_VANTAGE_API_KEY')
 
+MAX_ATTEMPTS = 3
+RETRY_DELAY_SECONDS = 10
+
 INDICATORS = [
     {'indicator_symbol': 'FEDFUNDS', 'indicator_name': 'Federal Funds Rate', 'indicator_source': 'FRED',
     'indicator_unit': 'Percent', 'category': 'macro', 'frequency': 'monthly'},

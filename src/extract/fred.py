@@ -3,7 +3,7 @@ import os
 import requests
 import json
 import time
-from src.config import FRED_API_KEY
+from src.config import FRED_API_KEY, MAX_ATTEMPTS, RETRY_DELAY_SECONDS
 
 
 logger = logging.getLogger(__name__)
@@ -39,13 +39,36 @@ def get_fred_data(series_id: str, observation_start: str = '1776-07-04') -> dict
         'observation_start': observation_start
     }
 
-    try:
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        
-    except requests.exceptions.RequestException as e:
-        logger.error("Error fetching data from FRED API: %s", e)
-        return None    
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            response = requests.get(url, params=params)
+            response.raise_for_status()
+            break
+
+        except requests.exceptions.RequestException as e:
+            # A 4xx other than 429 is our fault, not a hiccup: retrying changes nothing.
+            failed = e.response
+            if failed is not None and failed.status_code < 500 and failed.status_code != 429:
+                logger.error("Error fetching data from FRED API: %s", e)
+                return None
+
+            if attempt == MAX_ATTEMPTS:
+                logger.error(
+                    "Error fetching data from FRED API after %s attempts: %s",
+                    MAX_ATTEMPTS,
+                    e
+                )
+                return None
+
+            logger.warning(
+                "Attempt %s of %s failed for series_id %s, retrying in %ss: %s",
+                attempt,
+                MAX_ATTEMPTS,
+                series_id,
+                RETRY_DELAY_SECONDS,
+                e
+            )
+            time.sleep(RETRY_DELAY_SECONDS)
     
     raw_data = response.json()
 
